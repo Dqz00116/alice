@@ -1,0 +1,9 @@
+current_workflow = "MODE-A"
+current_step = "implement-sdd"
+workflow_run_id = "79b17a86"
+test_command = "cargo test"
+lint_command = "cargo clippy"
+build_command = "cargo build --release"
+test_unit_command = "cargo test --lib"
+test_integration_command = "cargo test --test integration"
+step_history = [ "req-create", "req-approve", "brainstorm", "write-plan",]

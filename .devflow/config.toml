@@ -1,0 +1,25 @@
+[project]
+name = "alice"
+language = "rust"
+stack = "Rust"
+version = "0.1.5"
+
+[commands]
+build = "cargo build --release"
+test = "cargo test"
+lint = "cargo clippy"
+test_unit = "cargo test --lib"
+test_integration = "cargo test --test integration"
+
+[paths]
+src = "src"
+tests = "tests"
+docs = "docs"
+
+[constraints]
+zero_warnings = true
+zero_mocks = false
+nullable = false
+
+[workflow]
+stages = [ "backlog", "analyzing", "analyzed", "approved", "in_progress", "done",]
