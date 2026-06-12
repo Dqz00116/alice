@@ -9,7 +9,7 @@ build = "cargo build --release"
 test = "cargo test"
 lint = "cargo clippy"
 test_unit = "cargo test --lib"
-test_integration = "cargo test --test integration"
+test_integration = "cargo test --test integration_test"
 
 [paths]
 src = "src"

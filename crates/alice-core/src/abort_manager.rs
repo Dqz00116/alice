@@ -5,6 +5,12 @@ pub struct AbortManager {
     abort_reason: Option<String>,
 }
 
+impl Default for AbortManager {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl AbortManager {
     pub fn new() -> Self {
         Self {

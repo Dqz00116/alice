@@ -13,6 +13,12 @@ pub struct ToolScheduler {
     handlers: HashMap<String, ToolHandler>,
 }
 
+impl Default for ToolScheduler {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ToolScheduler {
     pub fn new() -> Self {
         Self {

@@ -1,9 +1,10 @@
 current_workflow = "MODE-A"
-current_step = "code-review"
+current_step = "verify"
 workflow_run_id = "79b17a86"
 test_command = "cargo test"
 lint_command = "cargo clippy"
 build_command = "cargo build --release"
 test_unit_command = "cargo test --lib"
 test_integration_command = "cargo test --test integration"
-step_history = [ "req-create", "req-approve", "brainstorm", "write-plan", "implement-sdd",]
+step_history = [ "req-create", "req-approve", "brainstorm", "write-plan", "implement-sdd", "code-review", "test-run",]
+approved_items = [ "CODE-REVIEW-79b17a86",]

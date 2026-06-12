@@ -1,8 +1,10 @@
 use crate::{effect::Effect, event::Event};
 
+pub type ErasedProcessFn<Components> = Box<dyn Fn(&crate::world::Snapshot<&Components>, &Event) -> Vec<Effect> + Send + Sync>;
+
 /// A type-erased system that operates on `Snapshot<&Components>`.
 pub struct ErasedSystem<Components: ?Sized> {
-    process_fn: Box<dyn Fn(&crate::world::Snapshot<&Components>, &Event) -> Vec<Effect> + Send + Sync>,
+    process_fn: ErasedProcessFn<Components>,
 }
 
 impl<Components: ?Sized> ErasedSystem<Components> {
@@ -26,6 +28,12 @@ impl<Components: ?Sized> ErasedSystem<Components> {
 
 pub struct SystemRegistry<Components> {
     entries: Vec<(ErasedSystem<Components>, Vec<String>)>,
+}
+
+impl<Components> Default for SystemRegistry<Components> {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl<Components> SystemRegistry<Components> {
