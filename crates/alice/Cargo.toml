@@ -1,0 +1,15 @@
+[package]
+name = "alice"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "alice"
+path = "src/main.rs"
+
+[dependencies]
+alice-core = { path = "../alice-core" }
+alice-providers = { path = "../alice-providers" }
+alice-tools = { path = "../alice-tools" }
+tokio = { version = "1", features = ["full"] }
+anyhow = "1"

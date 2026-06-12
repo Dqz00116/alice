@@ -1,0 +1,8 @@
+[workspace]
+members = [
+    "crates/alice-core",
+    "crates/alice-providers",
+    "crates/alice-tools",
+    "crates/alice",
+]
+resolver = "2"

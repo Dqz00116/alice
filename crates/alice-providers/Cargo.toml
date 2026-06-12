@@ -1,0 +1,13 @@
+[package]
+name = "alice-providers"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+alice-core = { path = "../alice-core" }
+reqwest = { version = "0.12", features = ["json", "stream"] }
+tokio = { version = "1", features = ["sync"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+futures-core = "0.3"
+thiserror = "1"
