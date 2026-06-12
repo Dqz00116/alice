@@ -1,10 +1,10 @@
 use crate::{event::Event, system::System};
 
-pub struct SystemRegistry<C> {
-    entries: Vec<(Box<dyn System<C> + Send + Sync>, Vec<String>)>,
+pub struct SystemRegistry<'a, C> {
+    entries: Vec<(Box<dyn System<C> + Send + Sync + 'a>, Vec<String>)>,
 }
 
-impl<C> SystemRegistry<C> {
+impl<'a, C> SystemRegistry<'a, C> {
     pub fn new() -> Self {
         Self {
             entries: Vec::new(),
@@ -13,7 +13,7 @@ impl<C> SystemRegistry<C> {
 
     pub fn register<S>(&mut self, system: S, event_types: &[&str])
     where
-        S: System<C> + Send + Sync + 'static,
+        S: System<C> + Send + Sync + 'a,
     {
         self.entries.push((
             Box::new(system),
@@ -21,7 +21,7 @@ impl<C> SystemRegistry<C> {
         ));
     }
 
-    pub fn get_systems_for_event(&self, event: &Event) -> Vec<&dyn System<C>> {
+    pub fn get_systems_for_event(&self, event: &Event) -> Vec<&(dyn System<C> + Send + Sync + 'a)> {
         let event_type = event.event_type();
         self.entries
             .iter()

@@ -47,3 +47,8 @@ impl<C> Snapshot<C> {
         self.components.get()
     }
 }
+
+impl<T: HasComponent<C>, C> HasComponent<C> for &T {
+    fn get(&self) -> &C { (**self).get() }
+    fn get_mut(&mut self) -> &mut C { unreachable!("snapshot is immutable") }
+}

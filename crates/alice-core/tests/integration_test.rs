@@ -15,27 +15,31 @@ fn test_input_to_append_message_flow() {
     let tool_scheduler = ToolScheduler::new();
     let mut abort_manager = AbortManager::new();
 
-    let mut system_registry: SystemRegistry<MessagesComponent> = SystemRegistry::new();
-    system_registry.register(input_system::<MessagesComponent>, &["input.user"]);
+    let mut system_registry: SystemRegistry<&MessagesComponent> = SystemRegistry::new();
+    system_registry.register(input_system::<&MessagesComponent>, &["input.user"]);
 
+    // Create snapshot and process effects before executor borrows world mutably
+    let event = Event::Input(InputEvent {
+        source: "cli".into(),
+        content: "Hello Alice".into(),
+    });
+    let snapshot = world.snapshot();
+    let systems = system_registry.get_systems_for_event(&event);
+    let mut effects = Vec::new();
+    for sys in systems {
+        effects.extend(sys.process(&snapshot, &event));
+    }
+    // snapshot dropped here, releasing the immutable borrow on world
+    // Drop system_registry to release its type-level borrow on world
+    drop(system_registry);
+
+    // Now create executor with mutable access to world
     let mut executor = EffectExecutor::new(
         &mut world,
         &event_bus,
         &tool_scheduler,
         &mut abort_manager,
     );
-
-    // Simulate: InputSystem receives user input
-    let snapshot = world.snapshot();
-    let event = Event::Input(InputEvent {
-        source: "cli".into(),
-        content: "Hello Alice".into(),
-    });
-    let systems = system_registry.get_systems_for_event(&event);
-    let mut effects = Vec::new();
-    for sys in systems {
-        effects.extend(sys.process(&snapshot, &event));
-    }
     executor.execute(effects);
 
     // Verify message was appended

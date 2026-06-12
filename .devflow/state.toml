@@ -7,3 +7,4 @@ build_command = "cargo build --release"
 test_unit_command = "cargo test --lib"
 test_integration_command = "cargo test --test integration"
 step_history = [ "req-create", "req-approve", "brainstorm", "write-plan",]
+implement-sdd_fail_count = 1

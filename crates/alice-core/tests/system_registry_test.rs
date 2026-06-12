@@ -3,10 +3,17 @@ use alice_core::event::{Event, SystemEvent};
 use alice_core::system_registry::SystemRegistry;
 use alice_core::world::{HasComponent, Snapshot};
 
-struct TestComponents;
-impl HasComponent<()> for TestComponents {
-    fn get(&self) -> &() { &() }
-    fn get_mut(&mut self) -> &mut () { &mut () }
+struct InnerComponent {
+    _value: i32,
+}
+
+struct TestComponents {
+    inner: InnerComponent,
+}
+
+impl HasComponent<InnerComponent> for TestComponents {
+    fn get(&self) -> &InnerComponent { &self.inner }
+    fn get_mut(&mut self) -> &mut InnerComponent { &mut self.inner }
 }
 
 fn dummy_system(_snapshot: &Snapshot<&TestComponents>, _event: &Event) -> Vec<Effect> {

@@ -1,13 +1,14 @@
-use std::sync::Mutex;
+use std::sync::{Arc, Mutex};
 use alice_core::event::{Event, SystemEvent};
 use alice_core::event_bus::EventBus;
 
 #[test]
 fn test_subscribe_and_emit() {
     let mut bus = EventBus::new();
-    let received: Mutex<Vec<Event>> = Mutex::new(Vec::new());
-    bus.subscribe("system.step_start", |event| {
-        received.lock().unwrap().push(event.clone());
+    let received: Arc<Mutex<Vec<Event>>> = Arc::new(Mutex::new(Vec::new()));
+    let received_clone = Arc::clone(&received);
+    bus.subscribe("system.step_start", move |event| {
+        received_clone.lock().unwrap().push(event.clone());
     });
     let event = Event::System(SystemEvent::StepStart { step: 1 });
     bus.emit(&event);
