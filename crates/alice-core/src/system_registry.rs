@@ -1,10 +1,34 @@
-use crate::{event::Event, system::System};
+use crate::{effect::Effect, event::Event};
 
-pub struct SystemRegistry<'a, C> {
-    entries: Vec<(Box<dyn System<C> + Send + Sync + 'a>, Vec<String>)>,
+/// A type-erased system that operates on `Snapshot<&Components>`.
+pub struct ErasedSystem<Components: ?Sized> {
+    process_fn: Box<dyn Fn(&crate::world::Snapshot<&Components>, &Event) -> Vec<Effect> + Send + Sync>,
 }
 
-impl<'a, C> SystemRegistry<'a, C> {
+impl<Components: ?Sized> ErasedSystem<Components> {
+    pub fn new<S>(system: S) -> Self
+    where
+        S: Fn(&crate::world::Snapshot<&Components>, &Event) -> Vec<Effect> + Send + Sync + 'static,
+    {
+        Self {
+            process_fn: Box::new(system),
+        }
+    }
+
+    pub fn process(
+        &self,
+        snapshot: &crate::world::Snapshot<&Components>,
+        event: &Event,
+    ) -> Vec<Effect> {
+        (self.process_fn)(snapshot, event)
+    }
+}
+
+pub struct SystemRegistry<Components> {
+    entries: Vec<(ErasedSystem<Components>, Vec<String>)>,
+}
+
+impl<Components> SystemRegistry<Components> {
     pub fn new() -> Self {
         Self {
             entries: Vec::new(),
@@ -13,20 +37,20 @@ impl<'a, C> SystemRegistry<'a, C> {
 
     pub fn register<S>(&mut self, system: S, event_types: &[&str])
     where
-        S: System<C> + Send + Sync + 'a,
+        S: Fn(&crate::world::Snapshot<&Components>, &Event) -> Vec<Effect> + Send + Sync + 'static,
     {
         self.entries.push((
-            Box::new(system),
+            ErasedSystem::new(system),
             event_types.iter().map(|s| s.to_string()).collect(),
         ));
     }
 
-    pub fn get_systems_for_event(&self, event: &Event) -> Vec<&(dyn System<C> + Send + Sync + 'a)> {
+    pub fn get_systems_for_event(&self, event: &Event) -> Vec<&ErasedSystem<Components>> {
         let event_type = event.event_type();
         self.entries
             .iter()
             .filter(|(_, types)| types.iter().any(|t| t == event_type))
-            .map(|(sys, _)| sys.as_ref())
+            .map(|(sys, _)| sys)
             .collect()
     }
 }

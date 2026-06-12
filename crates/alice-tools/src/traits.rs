@@ -1,6 +1,6 @@
-use alice_core::types::ToolDef;
+pub use alice_core::types::ToolHandler;
 
-pub type ToolHandler = fn(args: serde_json::Value) -> String;
+use alice_core::types::ToolDef;
 
 pub struct Tool {
     pub def: ToolDef,

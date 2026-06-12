@@ -22,7 +22,7 @@ fn dummy_system(_snapshot: &Snapshot<&TestComponents>, _event: &Event) -> Vec<Ef
 
 #[test]
 fn test_register_and_lookup() {
-    let mut registry: SystemRegistry<&TestComponents> = SystemRegistry::new();
+    let mut registry: SystemRegistry<TestComponents> = SystemRegistry::new();
     registry.register(dummy_system, &["system.step_start"]);
     let event = Event::System(SystemEvent::StepStart { step: 1 });
     let systems = registry.get_systems_for_event(&event);

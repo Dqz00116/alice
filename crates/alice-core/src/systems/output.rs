@@ -2,7 +2,7 @@ use crate::effect::{Effect, StreamType};
 use crate::event::{Event, LLMStreamEvent, SystemEvent};
 use crate::world::Snapshot;
 
-pub fn output_system<C>(_snapshot: &Snapshot<C>, event: &Event) -> Vec<Effect> {
+pub fn output_system<C>(_snapshot: &Snapshot<&C>, event: &Event) -> Vec<Effect> {
     match event {
         Event::LLMStream(LLMStreamEvent::ThinkingDelta { delta }) => {
             vec![Effect::Render {

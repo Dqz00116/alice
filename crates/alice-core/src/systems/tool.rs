@@ -2,7 +2,7 @@ use crate::effect::Effect;
 use crate::event::{Event, LLMStreamEvent};
 use crate::world::Snapshot;
 
-pub fn tool_system<C>(_snapshot: &Snapshot<C>, event: &Event) -> Vec<Effect> {
+pub fn tool_system<C>(_snapshot: &Snapshot<&C>, event: &Event) -> Vec<Effect> {
     match event {
         Event::LLMStream(LLMStreamEvent::ToolCall { tool_call }) => {
             let args: serde_json::Value =
