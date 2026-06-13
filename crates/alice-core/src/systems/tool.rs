@@ -9,6 +9,7 @@ pub fn tool_system<C>(_snapshot: &Snapshot<&C>, event: &Event) -> Vec<Effect> {
                 serde_json::from_str(&tool_call.function.arguments)
                     .unwrap_or(serde_json::Value::Null);
             vec![Effect::ExecuteTool {
+                tool_call_id: tool_call.id.clone(),
                 tool_name: tool_call.function.name.clone(),
                 args,
             }]

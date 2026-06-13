@@ -67,9 +67,13 @@ where
             Effect::Abort { reason } => {
                 self.abort_manager.abort(reason);
             }
-            Effect::ExecuteTool { tool_name, args } => {
+            Effect::ExecuteTool {
+                tool_call_id,
+                tool_name,
+                args,
+            } => {
                 let tool_call = ToolCall {
-                    id: format!("tool_{}", uuid_simple()),
+                    id: tool_call_id,
                     call_type: "function".into(),
                     function: FunctionCall {
                         name: tool_name,
@@ -147,15 +151,6 @@ where
     fn dispatch_stream_event(&mut self, event: LLMStreamEvent) {
         self.event_sink.emit(Event::LLMStream(event));
     }
-}
-
-fn uuid_simple() -> String {
-    use std::time::{SystemTime, UNIX_EPOCH};
-    let ts = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .unwrap()
-        .as_nanos();
-    format!("{:x}", ts)
 }
 
 impl<T> ComponentAccessor for World<T>

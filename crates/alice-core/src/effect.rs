@@ -8,6 +8,7 @@ pub enum Effect {
         messages: Vec<Message>,
     },
     ExecuteTool {
+        tool_call_id: String,
         tool_name: String,
         args: serde_json::Value,
     },
