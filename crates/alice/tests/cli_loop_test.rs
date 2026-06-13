@@ -134,4 +134,5 @@ async fn test_full_loop_with_mock_provider() {
     assert_eq!(messages.len(), 2, "expected user + assistant messages");
     assert!(matches!(messages[0], Message::User { .. }));
     assert!(matches!(messages[1], Message::Assistant { .. }));
+    assert_eq!(world.get::<LoopComponent>().step, 1);
 }
