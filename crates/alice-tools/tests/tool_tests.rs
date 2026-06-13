@@ -2,11 +2,13 @@ use alice_tools::{bash, edit_file, glob, read_file, write_file};
 use std::fs;
 
 fn tmp_dir() -> std::path::PathBuf {
+    let thread_id = format!("{:?}", std::thread::current().id());
     let dir = std::env::current_dir()
         .unwrap()
         .join("target")
         .join("tmp")
-        .join("tool_tests");
+        .join("tool_tests")
+        .join(thread_id);
     fs::create_dir_all(&dir).unwrap();
     dir
 }
