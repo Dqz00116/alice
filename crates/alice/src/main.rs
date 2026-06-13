@@ -53,12 +53,17 @@ async fn main() -> anyhow::Result<()> {
         Ok(url) if !url.is_empty() => url,
         _ => "https://api.anthropic.com".into(),
     };
+    let model = match std::env::var("ANTHROPIC_MODEL") {
+        Ok(m) if !m.is_empty() => m,
+        _ => "claude-3-5-sonnet-20241022".into(),
+    };
 
     let mut world = World::new(AllComponents {
         messages: MessagesComponent::default(),
         config: ConfigComponent {
             api_key: api_key.clone(),
             base_url: base_url.clone(),
+            model: model.clone(),
             ..ConfigComponent::default()
         },
         loop_state: LoopComponent { step: 0, should_continue: true },
