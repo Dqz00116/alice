@@ -13,3 +13,8 @@ alice-providers = { path = "../alice-providers" }
 alice-tools = { path = "../alice-tools" }
 tokio = { version = "1", features = ["full"] }
 anyhow = "1"
+
+[dev-dependencies]
+futures-core = "0.3"
+futures-util = "0.3"
+serde_json = "1"

@@ -36,8 +36,10 @@ pub enum Effect {
 /// Systems produce these closures over the `ComponentAccessor` trait so that
 /// the `Effect` enum can remain non-generic while still permitting type-safe
 /// mutations of the concrete component bundle.
+pub type UpdateClosure = dyn Fn(&mut dyn ComponentAccessor) + Send + Sync;
+
 pub struct UpdateFn {
-    f: std::sync::Arc<dyn Fn(&mut dyn ComponentAccessor) + Send + Sync>,
+    f: std::sync::Arc<UpdateClosure>,
 }
 
 impl UpdateFn {
@@ -45,7 +47,9 @@ impl UpdateFn {
     where
         F: Fn(&mut dyn ComponentAccessor) + Send + Sync + 'static,
     {
-        Self { f: std::sync::Arc::new(f) }
+        Self {
+            f: std::sync::Arc::new(f),
+        }
     }
 
     pub fn apply(&self, accessor: &mut dyn ComponentAccessor) {

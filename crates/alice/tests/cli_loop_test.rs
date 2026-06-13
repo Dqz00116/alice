@@ -2,20 +2,20 @@ use alice_core::components::{
     ConfigComponent, LoopComponent, MessagesComponent, ProviderComponent, ToolsComponent,
 };
 use alice_core::effect_executor::EffectExecutor;
-use alice_core::event::{Event, InputEvent};
-
+use alice_core::event::{Event, InputEvent, LLMStreamEvent};
+use alice_core::providers::StreamingProvider;
 use alice_core::system_registry::SystemRegistry;
 use alice_core::systems::{hook, input, output, provider, tool};
 use alice_core::tool_scheduler::ToolScheduler;
 use alice_core::abort_manager::AbortManager;
+use alice_core::types::Message;
 use alice_core::world::{HasComponent, World};
-use alice_providers::anthropic::AnthropicProvider;
-use alice_tools::echo;
+use futures_core::Stream;
 use std::collections::VecDeque;
-use std::io::{self, Write};
+use std::pin::Pin;
 
 #[derive(Default)]
-struct AllComponents {
+struct TestComponents {
     messages: MessagesComponent,
     config: ConfigComponent,
     loop_state: LoopComponent,
@@ -23,65 +23,71 @@ struct AllComponents {
     provider: ProviderComponent,
 }
 
-impl HasComponent<MessagesComponent> for AllComponents {
+impl HasComponent<MessagesComponent> for TestComponents {
     fn get(&self) -> &MessagesComponent { &self.messages }
     fn get_mut(&mut self) -> &mut MessagesComponent { &mut self.messages }
 }
 
-impl HasComponent<ConfigComponent> for AllComponents {
+impl HasComponent<ConfigComponent> for TestComponents {
     fn get(&self) -> &ConfigComponent { &self.config }
     fn get_mut(&mut self) -> &mut ConfigComponent { &mut self.config }
 }
 
-impl HasComponent<LoopComponent> for AllComponents {
+impl HasComponent<LoopComponent> for TestComponents {
     fn get(&self) -> &LoopComponent { &self.loop_state }
     fn get_mut(&mut self) -> &mut LoopComponent { &mut self.loop_state }
 }
 
-impl HasComponent<ToolsComponent> for AllComponents {
+impl HasComponent<ToolsComponent> for TestComponents {
     fn get(&self) -> &ToolsComponent { &self.tools }
     fn get_mut(&mut self) -> &mut ToolsComponent { &mut self.tools }
 }
 
-impl HasComponent<ProviderComponent> for AllComponents {
+impl HasComponent<ProviderComponent> for TestComponents {
     fn get(&self) -> &ProviderComponent { &self.provider }
     fn get_mut(&mut self) -> &mut ProviderComponent { &mut self.provider }
 }
 
-#[tokio::main]
-async fn main() -> anyhow::Result<()> {
-    let api_key = std::env::var("ANTHROPIC_API_KEY").unwrap_or_default();
-    if api_key.is_empty() {
-        eprintln!("Warning: ANTHROPIC_API_KEY not set. LLM calls will fail.");
+struct EchoProvider;
+
+impl StreamingProvider for EchoProvider {
+    fn format_messages(&self, messages: &[Message]) -> serde_json::Value {
+        serde_json::json!({ "messages": messages.len() })
     }
 
-    let mut world = World::new(AllComponents {
-        messages: MessagesComponent::default(),
-        config: ConfigComponent::default(),
+    fn stream_chat(
+        &self,
+        _body: serde_json::Value,
+    ) -> Pin<Box<dyn Stream<Item = LLMStreamEvent> + Send + '_>> {
+        Box::pin(futures_util::stream::iter(vec![
+            LLMStreamEvent::TextDelta { delta: "Hello".into() },
+            LLMStreamEvent::TextDelta { delta: " back".into() },
+            LLMStreamEvent::StreamEnd { stop_reason: "end_turn".into() },
+        ]))
+    }
+}
+
+#[tokio::test]
+async fn test_full_loop_with_mock_provider() {
+    let mut world = World::new(TestComponents {
         loop_state: LoopComponent { step: 0, should_continue: true },
-        tools: ToolsComponent {
-            definitions: vec![echo::echo_def()],
-        },
-        provider: ProviderComponent {
-            api_key: Some(api_key.clone()),
-        },
+        ..TestComponents::default()
     });
 
     let mut queue: VecDeque<Event> = VecDeque::new();
-    let mut tool_scheduler = ToolScheduler::new();
-    tool_scheduler.register(echo::echo_def(), echo::echo_handler);
+    let tool_scheduler = ToolScheduler::new();
     let mut abort_manager = AbortManager::new();
 
-    let mut registry = SystemRegistry::<AllComponents>::new();
-    registry.register(input::input_system::<AllComponents>, &["input.user"]);
-    registry.register(provider::provider_system::<AllComponents>, &[
+    let mut registry = SystemRegistry::<TestComponents>::new();
+    registry.register(input::input_system::<TestComponents>, &["input.user"]);
+    registry.register(provider::provider_system::<TestComponents>, &[
         "system.step_start",
         "tool.result",
         "tool.error",
     ]);
-    registry.register(tool::tool_system::<AllComponents>, &["llm.tool_call"]);
+    registry.register(tool::tool_system::<TestComponents>, &["llm.tool_call"]);
     registry.register(
-        output::output_system::<AllComponents>,
+        output::output_system::<TestComponents>,
         &[
             "llm.thinking_delta",
             "llm.text_delta",
@@ -90,29 +96,16 @@ async fn main() -> anyhow::Result<()> {
             "llm.stream_error",
         ],
     );
-    registry.register(hook::hook_system::<AllComponents>, &["system.hook_trigger"]);
+    registry.register(hook::hook_system::<TestComponents>, &["system.hook_trigger"]);
 
-    let provider = AnthropicProvider::new(api_key, world.get::<ConfigComponent>().model.clone());
-
-    print!("You: ");
-    io::stdout().flush()?;
-    let mut input = String::new();
-    io::stdin().read_line(&mut input)?;
-    let input = input.trim().to_string();
-    if input.is_empty() {
-        return Ok(());
-    }
+    let provider = EchoProvider;
 
     queue.push_back(Event::Input(InputEvent {
-        source: "cli".into(),
-        content: input,
+        source: "test".into(),
+        content: "Hi".into(),
     }));
 
     while let Some(event) = queue.pop_front() {
-        if abort_manager.is_aborted() {
-            break;
-        }
-
         let systems = registry.get_systems_for_event(&event);
         let effects = {
             let snapshot = world.snapshot();
@@ -137,6 +130,8 @@ async fn main() -> anyhow::Result<()> {
         }
     }
 
-    println!("\n[Alice session ended]");
-    Ok(())
+    let messages = &world.get::<MessagesComponent>().messages;
+    assert_eq!(messages.len(), 2, "expected user + assistant messages");
+    assert!(matches!(messages[0], Message::User { .. }));
+    assert!(matches!(messages[1], Message::Assistant { .. }));
 }

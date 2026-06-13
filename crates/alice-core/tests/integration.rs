@@ -2,13 +2,17 @@ use alice_core::components::{
     ConfigComponent, LoopComponent, MessagesComponent, ProviderComponent, ToolsComponent,
 };
 use alice_core::effect_executor::EffectExecutor;
-use alice_core::event::{Event, InputEvent};
+use alice_core::event::{Event, InputEvent, LLMStreamEvent};
 use alice_core::event_bus::EventBus;
+use alice_core::providers::StreamingProvider;
 use alice_core::system_registry::SystemRegistry;
 use alice_core::systems::input::input_system;
 use alice_core::tool_scheduler::ToolScheduler;
+use alice_core::types::Message;
 use alice_core::abort_manager::AbortManager;
 use alice_core::world::{HasComponent, World};
+use futures_core::Stream;
+use std::pin::Pin;
 
 #[derive(Default)]
 struct TestComponents {
@@ -44,13 +48,29 @@ impl HasComponent<ProviderComponent> for TestComponents {
     fn get_mut(&mut self) -> &mut ProviderComponent { &mut self.provider }
 }
 
-#[test]
-fn test_input_to_append_message_flow() {
+struct NullProvider;
+
+impl StreamingProvider for NullProvider {
+    fn format_messages(&self, _messages: &[Message]) -> serde_json::Value {
+        serde_json::Value::Null
+    }
+
+    fn stream_chat(
+        &self,
+        _body: serde_json::Value,
+    ) -> Pin<Box<dyn Stream<Item = LLMStreamEvent> + Send + '_>> {
+        Box::pin(futures_util::stream::iter(vec![]))
+    }
+}
+
+#[tokio::test]
+async fn test_input_to_append_message_flow() {
     let components = TestComponents::default();
     let mut world = World::new(components);
-    let event_bus = EventBus::new();
+    let mut event_bus = EventBus::new();
     let tool_scheduler = ToolScheduler::new();
     let mut abort_manager = AbortManager::new();
+    let provider = NullProvider;
 
     let mut system_registry: SystemRegistry<TestComponents> = SystemRegistry::new();
     system_registry.register(input_system::<TestComponents>, &["input.user"]);
@@ -68,13 +88,14 @@ fn test_input_to_append_message_flow() {
 
     let mut executor = EffectExecutor::new(
         &mut world,
-        &event_bus,
+        &mut event_bus,
         &tool_scheduler,
         &mut abort_manager,
+        &provider,
     );
-    executor.execute(effects);
+    executor.execute(effects).await;
 
     let msgs = &world.get::<MessagesComponent>().messages;
     assert_eq!(msgs.len(), 1);
-    assert!(matches!(msgs[0], alice_core::types::Message::User { .. }));
+    assert!(matches!(msgs[0], Message::User { .. }));
 }

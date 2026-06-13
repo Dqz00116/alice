@@ -3,21 +3,24 @@ use crate::components::{
     ToolsComponent,
 };
 use crate::effect::Effect;
-use crate::event::{Event, ToolEvent};
-use crate::event_bus::EventBus;
+use crate::event::{Event, LLMStreamEvent, SystemEvent, ToolEvent};
+use crate::event_bus::EventSink;
+use crate::providers::StreamingProvider;
 use crate::tool_scheduler::ToolScheduler;
 use crate::abort_manager::AbortManager;
 use crate::types::{FunctionCall, ToolCall};
 use crate::world::{HasComponent, World};
+use futures_util::StreamExt;
 
-pub struct EffectExecutor<'a, Components> {
+pub struct EffectExecutor<'a, Components, P> {
     world: &'a mut World<Components>,
-    event_bus: &'a EventBus,
+    event_sink: &'a mut dyn EventSink,
     tool_scheduler: &'a ToolScheduler,
     abort_manager: &'a mut AbortManager,
+    provider: &'a P,
 }
 
-impl<'a, Components> EffectExecutor<'a, Components>
+impl<'a, Components, P> EffectExecutor<'a, Components, P>
 where
     Components: HasComponent<MessagesComponent>
         + HasComponent<LoopComponent>
@@ -25,28 +28,31 @@ where
         + HasComponent<ToolsComponent>
         + HasComponent<ProviderComponent>,
     World<Components>: ComponentAccessor,
+    P: StreamingProvider,
 {
     pub fn new(
         world: &'a mut World<Components>,
-        event_bus: &'a EventBus,
+        event_sink: &'a mut dyn EventSink,
         tool_scheduler: &'a ToolScheduler,
         abort_manager: &'a mut AbortManager,
+        provider: &'a P,
     ) -> Self {
         Self {
             world,
-            event_bus,
+            event_sink,
             tool_scheduler,
             abort_manager,
+            provider,
         }
     }
 
-    pub fn execute(&mut self, effects: Vec<Effect>) {
+    pub async fn execute(&mut self, effects: Vec<Effect>) {
         for effect in effects {
-            self.apply(effect);
+            self.apply(effect).await;
         }
     }
 
-    fn apply(&mut self, effect: Effect) {
+    async fn apply(&mut self, effect: Effect) {
         match effect {
             Effect::AppendMessage { entity: _, message } => {
                 self.world.get_mut::<MessagesComponent>().messages.push(message);
@@ -55,7 +61,7 @@ where
                 update.apply(self.world);
             }
             Effect::Emit { event } => {
-                self.event_bus.emit(&event);
+                self.event_sink.emit(event);
             }
             Effect::Render { content, stream: _ } => {
                 print!("{}", content);
@@ -76,13 +82,13 @@ where
                 if let Some(r) = results.into_iter().next() {
                     match r.error {
                         Some(err) => {
-                            self.event_bus.emit(&Event::Tool(ToolEvent::Error {
+                            self.event_sink.emit(Event::Tool(ToolEvent::Error {
                                 tool_call_id: r.tool_call_id,
                                 error: err,
                             }));
                         }
                         None => {
-                            self.event_bus.emit(&Event::Tool(ToolEvent::Result {
+                            self.event_sink.emit(Event::Tool(ToolEvent::Result {
                                 tool_call_id: r.tool_call_id,
                                 result: r.result.unwrap_or_default(),
                             }));
@@ -90,10 +96,43 @@ where
                     }
                 }
             }
-            Effect::CallLLM { messages: _ } => {
-                // Placeholder: wired when StreamingProvider is connected in later batch.
+            Effect::CallLLM { messages } => {
+                let body = self.provider.format_messages(&messages);
+                let mut stream = self.provider.stream_chat(body);
+                let mut assistant_content = String::new();
+                let mut tool_calls = Vec::new();
+                while let Some(event) = stream.next().await {
+                    match &event {
+                        LLMStreamEvent::TextDelta { delta } => {
+                            assistant_content.push_str(delta);
+                        }
+                        LLMStreamEvent::ThinkingDelta { .. } => {}
+                        LLMStreamEvent::ToolCall { tool_call } => {
+                            tool_calls.push(tool_call.clone());
+                        }
+                        LLMStreamEvent::StreamEnd { .. } => {
+                            if !assistant_content.is_empty() || !tool_calls.is_empty() {
+                                self.world.get_mut::<MessagesComponent>().messages.push(
+                                    crate::types::Message::Assistant {
+                                        content: assistant_content.clone(),
+                                        tool_calls: tool_calls.clone(),
+                                    },
+                                );
+                            }
+                            self.event_sink.emit(Event::System(SystemEvent::HookTrigger {
+                                hook: "afterStep".into(),
+                            }));
+                        }
+                        LLMStreamEvent::StreamError { .. } => {}
+                    }
+                    self.dispatch_stream_event(event);
+                }
             }
         }
+    }
+
+    fn dispatch_stream_event(&mut self, event: LLMStreamEvent) {
+        self.event_sink.emit(Event::LLMStream(event));
     }
 }
 

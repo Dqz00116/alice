@@ -1,10 +1,36 @@
 use crate::event::Event;
 use std::collections::HashMap;
+use std::sync::{Arc, RwLock};
 
-type Handler = Box<dyn Fn(&Event) + Send + Sync>;
+type Handler = Arc<dyn Fn(&Event) + Send + Sync>;
 
+/// Sink for events produced by `EffectExecutor`.
+pub trait EventSink {
+    /// Deliver or queue an event.
+    fn emit(&mut self, event: Event);
+}
+
+impl EventSink for EventBus {
+    fn emit(&mut self, event: Event) {
+        EventBus::emit(self, &event);
+    }
+}
+
+impl EventSink for Vec<Event> {
+    fn emit(&mut self, event: Event) {
+        self.push(event);
+    }
+}
+
+impl EventSink for std::collections::VecDeque<Event> {
+    fn emit(&mut self, event: Event) {
+        self.push_back(event);
+    }
+}
+
+#[derive(Clone)]
 pub struct EventBus {
-    subscribers: HashMap<String, Vec<Handler>>,
+    subscribers: Arc<RwLock<HashMap<String, Vec<Handler>>>>,
 }
 
 impl Default for EventBus {
@@ -16,7 +42,7 @@ impl Default for EventBus {
 impl EventBus {
     pub fn new() -> Self {
         Self {
-            subscribers: HashMap::new(),
+            subscribers: Arc::new(RwLock::new(HashMap::new())),
         }
     }
 
@@ -24,15 +50,16 @@ impl EventBus {
     where
         F: Fn(&Event) + Send + Sync + 'static,
     {
-        self.subscribers
-            .entry(event_type.to_string())
+        let mut subs = self.subscribers.write().unwrap();
+        subs.entry(event_type.to_string())
             .or_default()
-            .push(Box::new(handler));
+            .push(Arc::new(handler));
     }
 
     pub fn emit(&self, event: &Event) {
         let event_type = event.event_type();
-        if let Some(handlers) = self.subscribers.get(event_type) {
+        let subs = self.subscribers.read().unwrap();
+        if let Some(handlers) = subs.get(event_type) {
             for handler in handlers {
                 handler(event);
             }

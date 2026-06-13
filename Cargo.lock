@@ -10,6 +10,9 @@ dependencies = [
  "alice-providers",
  "alice-tools",
  "anyhow",
+ "futures-core",
+ "futures-util",
+ "serde_json",
  "tokio",
 ]
 
@@ -18,6 +21,7 @@ name = "alice-core"
 version = "0.1.0"
 dependencies = [
  "futures-core",
+ "futures-util",
  "serde",
  "serde_json",
  "thiserror",
@@ -31,6 +35,7 @@ dependencies = [
  "alice-core",
  "async-stream",
  "futures-core",
+ "futures-util",
  "reqwest",
  "serde",
  "serde_json",
