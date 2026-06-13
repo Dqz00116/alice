@@ -19,6 +19,7 @@ pub struct ConfigComponent {
     pub max_steps: u32,
     pub provider: String,
     pub api_key: Option<String>,
+    pub base_url: String,
 }
 
 impl Default for ConfigComponent {
@@ -29,6 +30,7 @@ impl Default for ConfigComponent {
             max_steps: 10,
             provider: "anthropic".into(),
             api_key: None,
+            base_url: "https://api.anthropic.com".into(),
         }
     }
 }

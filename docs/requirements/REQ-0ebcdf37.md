@@ -1,7 +1,7 @@
 ---
 id: REQ-0ebcdf37
 title: .env Support and Live LLM API Tests
-status: approved
+status: done
 ---
 
 # .env Support and Live LLM API Tests
