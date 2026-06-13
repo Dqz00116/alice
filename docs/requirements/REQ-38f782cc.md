@@ -1,7 +1,7 @@
 ---
 id: REQ-38f782cc
 title: Complete Rust Rewrite and Remove TypeScript Implementation
-status: approved
+status: done
 priority: high
 ---
 
