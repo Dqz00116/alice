@@ -1,9 +1,8 @@
 use alice_core::components::{
-    ConfigComponent, LoopComponent, MessagesComponent, ProviderComponent, ToolsComponent,
+    ConfigComponent, LoopComponent, MessagesComponent, ToolsComponent,
 };
 use alice_core::effect_executor::EffectExecutor;
 use alice_core::event::{Event, InputEvent};
-
 use alice_core::system_registry::SystemRegistry;
 use alice_core::systems::{hook, input, output, provider, tool};
 use alice_core::tool_scheduler::ToolScheduler;
@@ -20,7 +19,6 @@ struct AllComponents {
     config: ConfigComponent,
     loop_state: LoopComponent,
     tools: ToolsComponent,
-    provider: ProviderComponent,
 }
 
 impl HasComponent<MessagesComponent> for AllComponents {
@@ -43,27 +41,22 @@ impl HasComponent<ToolsComponent> for AllComponents {
     fn get_mut(&mut self) -> &mut ToolsComponent { &mut self.tools }
 }
 
-impl HasComponent<ProviderComponent> for AllComponents {
-    fn get(&self) -> &ProviderComponent { &self.provider }
-    fn get_mut(&mut self) -> &mut ProviderComponent { &mut self.provider }
-}
-
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    let api_key = std::env::var("ANTHROPIC_API_KEY").unwrap_or_default();
-    if api_key.is_empty() {
+    let api_key = std::env::var("ANTHROPIC_API_KEY").ok();
+    if api_key.is_none() {
         eprintln!("Warning: ANTHROPIC_API_KEY not set. LLM calls will fail.");
     }
 
     let mut world = World::new(AllComponents {
         messages: MessagesComponent::default(),
-        config: ConfigComponent::default(),
+        config: ConfigComponent {
+            api_key: api_key.clone(),
+            ..ConfigComponent::default()
+        },
         loop_state: LoopComponent { step: 0, should_continue: true },
         tools: ToolsComponent {
             definitions: vec![echo::echo_def()],
-        },
-        provider: ProviderComponent {
-            api_key: Some(api_key.clone()),
         },
     });
 
@@ -92,7 +85,10 @@ async fn main() -> anyhow::Result<()> {
     );
     registry.register(hook::hook_system::<AllComponents>, &["system.hook_trigger"]);
 
-    let provider = AnthropicProvider::new(api_key, world.get::<ConfigComponent>().model.clone());
+    let provider = AnthropicProvider::new(
+        api_key.unwrap_or_default(),
+        world.get::<ConfigComponent>().model.clone(),
+    );
 
     print!("You: ");
     io::stdout().flush()?;

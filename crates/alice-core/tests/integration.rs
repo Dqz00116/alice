@@ -1,5 +1,5 @@
 use alice_core::components::{
-    ConfigComponent, LoopComponent, MessagesComponent, ProviderComponent, ToolsComponent,
+    ConfigComponent, LoopComponent, MessagesComponent, ToolsComponent,
 };
 use alice_core::effect_executor::EffectExecutor;
 use alice_core::event::{Event, InputEvent, LLMStreamEvent};
@@ -20,7 +20,6 @@ struct TestComponents {
     config: ConfigComponent,
     loop_state: LoopComponent,
     tools: ToolsComponent,
-    provider: ProviderComponent,
 }
 
 impl HasComponent<MessagesComponent> for TestComponents {
@@ -41,11 +40,6 @@ impl HasComponent<LoopComponent> for TestComponents {
 impl HasComponent<ToolsComponent> for TestComponents {
     fn get(&self) -> &ToolsComponent { &self.tools }
     fn get_mut(&mut self) -> &mut ToolsComponent { &mut self.tools }
-}
-
-impl HasComponent<ProviderComponent> for TestComponents {
-    fn get(&self) -> &ProviderComponent { &self.provider }
-    fn get_mut(&mut self) -> &mut ProviderComponent { &mut self.provider }
 }
 
 struct NullProvider;

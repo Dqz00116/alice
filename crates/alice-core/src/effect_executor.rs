@@ -1,6 +1,5 @@
 use crate::components::{
-    ComponentAccessor, ConfigComponent, LoopComponent, MessagesComponent, ProviderComponent,
-    ToolsComponent,
+    ComponentAccessor, ConfigComponent, LoopComponent, MessagesComponent, ToolsComponent,
 };
 use crate::effect::Effect;
 use crate::event::{Event, LLMStreamEvent, SystemEvent, ToolEvent};
@@ -25,8 +24,7 @@ where
     Components: HasComponent<MessagesComponent>
         + HasComponent<LoopComponent>
         + HasComponent<ConfigComponent>
-        + HasComponent<ToolsComponent>
-        + HasComponent<ProviderComponent>,
+        + HasComponent<ToolsComponent>,
     World<Components>: ComponentAccessor,
     P: StreamingProvider,
 {
@@ -164,8 +162,7 @@ where
     T: HasComponent<MessagesComponent>
         + HasComponent<LoopComponent>
         + HasComponent<ConfigComponent>
-        + HasComponent<ToolsComponent>
-        + HasComponent<ProviderComponent>,
+        + HasComponent<ToolsComponent>,
 {
     fn messages_mut(&mut self) -> &mut MessagesComponent {
         self.get_mut::<MessagesComponent>()
@@ -181,9 +178,5 @@ where
 
     fn tools_mut(&mut self) -> &mut ToolsComponent {
         self.get_mut::<ToolsComponent>()
-    }
-
-    fn provider_mut(&mut self) -> &mut ProviderComponent {
-        self.get_mut::<ProviderComponent>()
     }
 }

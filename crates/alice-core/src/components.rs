@@ -18,6 +18,7 @@ pub struct ConfigComponent {
     pub temperature: f32,
     pub max_steps: u32,
     pub provider: String,
+    pub api_key: Option<String>,
 }
 
 impl Default for ConfigComponent {
@@ -27,6 +28,7 @@ impl Default for ConfigComponent {
             temperature: 0.7,
             max_steps: 10,
             provider: "anthropic".into(),
+            api_key: None,
         }
     }
 }
@@ -44,12 +46,6 @@ pub struct ToolsComponent {
     pub definitions: Vec<ToolDef>,
 }
 
-/// Provider configuration for the active entity.
-#[derive(Clone, Debug, Default)]
-pub struct ProviderComponent {
-    pub api_key: Option<String>,
-}
-
 /// Mutable accessor used by `Effect::UpdateComponent`.
 ///
 /// Implement this trait for any component bundle that contains all engine
@@ -60,5 +56,4 @@ pub trait ComponentAccessor {
     fn config_mut(&mut self) -> &mut ConfigComponent;
     fn loop_mut(&mut self) -> &mut LoopComponent;
     fn tools_mut(&mut self) -> &mut ToolsComponent;
-    fn provider_mut(&mut self) -> &mut ProviderComponent;
 }
