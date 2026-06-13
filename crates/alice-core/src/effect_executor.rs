@@ -130,10 +130,10 @@ where
                                     },
                                 );
                             }
+                            self.world.get_mut::<LoopComponent>().step += 1;
                             self.event_sink.emit(Event::System(SystemEvent::HookTrigger {
                                 hook: "afterStep".into(),
                             }));
-                            self.world.get_mut::<LoopComponent>().step += 1;
                         }
                         LLMStreamEvent::StreamError { .. } => {}
                     }

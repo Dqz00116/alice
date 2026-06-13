@@ -34,8 +34,14 @@ where
                 ]
             }
             "shouldContinue" => {
-                // No-op by default; the flag has already been computed in afterStep.
-                vec![]
+                let should_continue = snapshot.get::<LoopComponent>().should_continue;
+                if should_continue {
+                    vec![]
+                } else {
+                    vec![Effect::Abort {
+                        reason: "shouldContinue returned false".into(),
+                    }]
+                }
             }
             _ => vec![],
         },

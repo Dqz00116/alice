@@ -22,6 +22,11 @@ where
                     },
                 },
                 Effect::Emit {
+                    event: Event::System(SystemEvent::HookTrigger {
+                        hook: "beforeStep".into(),
+                    }),
+                },
+                Effect::Emit {
                     event: Event::System(SystemEvent::StepStart { step }),
                 },
                 Effect::UpdateComponent {
