@@ -1,5 +1,5 @@
 use alice_core::event::LLMStreamEvent;
-use alice_core::types::Message;
+use alice_core::types::{Message, ToolDef};
 use futures_core::Stream;
 use futures_util::StreamExt;
 use std::pin::Pin;
@@ -62,7 +62,7 @@ pub fn parse_sse_data(data: &str) -> Option<LLMStreamEvent> {
 }
 
 impl super::traits::StreamingProvider for AnthropicProvider {
-    fn format_messages(&self, messages: &[Message]) -> serde_json::Value {
+    fn format_messages(&self, messages: &[Message], tools: &[ToolDef]) -> serde_json::Value {
         let formatted: Vec<serde_json::Value> = messages
             .iter()
             .map(|m| match m {
@@ -89,12 +89,27 @@ impl super::traits::StreamingProvider for AnthropicProvider {
             })
             .collect();
 
-        serde_json::json!({
+        let tools_json: Vec<serde_json::Value> = tools
+            .iter()
+            .map(|t| {
+                serde_json::json!({
+                    "name": t.name,
+                    "description": t.description,
+                    "input_schema": t.input_schema,
+                })
+            })
+            .collect();
+
+        let mut body = serde_json::json!({
             "model": self.model,
             "messages": formatted,
             "max_tokens": 4096,
             "stream": true,
-        })
+        });
+        if !tools_json.is_empty() {
+            body["tools"] = serde_json::Value::Array(tools_json);
+        }
+        body
     }
 
     fn stream_chat(

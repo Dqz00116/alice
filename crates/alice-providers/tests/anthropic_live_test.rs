@@ -16,9 +16,12 @@ async fn test_anthropic_live_stream_chat() {
         "https://api.anthropic.com".into(),
     );
 
-    let body = provider.format_messages(&[Message::User {
-        content: "Say hello in one word.".into(),
-    }]);
+    let body = provider.format_messages(
+        &[Message::User {
+            content: "Say hello in one word.".into(),
+        }],
+        &[],
+    );
 
     let mut stream = provider.stream_chat(body);
     let mut events = Vec::new();

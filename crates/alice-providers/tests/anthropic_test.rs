@@ -1,4 +1,6 @@
 use alice_core::event::LLMStreamEvent;
+use alice_core::providers::StreamingProvider;
+use alice_core::types::ToolDef;
 use alice_providers::anthropic::{parse_sse_data, AnthropicProvider};
 
 #[test]
@@ -75,4 +77,28 @@ fn test_custom_model_id() {
         "https://api.anthropic.com".into(),
     );
     assert_eq!(provider.model(), "claude-test-model");
+}
+
+#[test]
+fn test_format_messages_includes_tools() {
+    let provider = AnthropicProvider::new(
+        "fake-key".into(),
+        "claude-test".into(),
+        "https://api.anthropic.com".into(),
+    );
+    let tools = vec![ToolDef {
+        name: "echo".into(),
+        description: "Echoes input".into(),
+        input_schema: serde_json::json!({
+            "type": "object",
+            "properties": {
+                "message": { "type": "string" }
+            },
+            "required": ["message"]
+        }),
+    }];
+    let body = provider.format_messages(&[], &tools);
+    let tools_array = body.get("tools").and_then(|v| v.as_array()).expect("expected tools array");
+    assert_eq!(tools_array.len(), 1);
+    assert_eq!(tools_array[0].get("name").and_then(|v| v.as_str()), Some("echo"));
 }

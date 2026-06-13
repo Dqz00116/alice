@@ -9,7 +9,7 @@ use alice_core::system_registry::SystemRegistry;
 use alice_core::systems::{hook, input, output, provider, tool};
 use alice_core::tool_scheduler::ToolScheduler;
 use alice_core::abort_manager::AbortManager;
-use alice_core::types::Message;
+use alice_core::types::{Message, ToolDef};
 use alice_core::world::{HasComponent, World};
 use futures_core::Stream;
 use std::collections::VecDeque;
@@ -46,7 +46,7 @@ impl HasComponent<ToolsComponent> for TestComponents {
 struct EchoProvider;
 
 impl StreamingProvider for EchoProvider {
-    fn format_messages(&self, messages: &[Message]) -> serde_json::Value {
+    fn format_messages(&self, messages: &[Message], _tools: &[ToolDef]) -> serde_json::Value {
         serde_json::json!({ "messages": messages.len() })
     }
 

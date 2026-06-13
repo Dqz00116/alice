@@ -44,7 +44,7 @@ impl HasComponent<ToolsComponent> for TestComponents {
 struct NullProvider;
 
 impl StreamingProvider for NullProvider {
-    fn format_messages(&self, _messages: &[Message]) -> serde_json::Value {
+    fn format_messages(&self, _messages: &[Message], _tools: &[ToolDef]) -> serde_json::Value {
         serde_json::Value::Null
     }
 
@@ -123,7 +123,7 @@ async fn test_call_llm_increments_loop_step() {
 
     struct CountingProvider;
     impl StreamingProvider for CountingProvider {
-        fn format_messages(&self, _messages: &[Message]) -> serde_json::Value {
+        fn format_messages(&self, _messages: &[Message], _tools: &[ToolDef]) -> serde_json::Value {
             serde_json::Value::Null
         }
         fn stream_chat(

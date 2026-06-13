@@ -8,7 +8,7 @@ use alice_core::providers::StreamingProvider;
 use alice_core::system_registry::SystemRegistry;
 use alice_core::systems::input::input_system;
 use alice_core::tool_scheduler::ToolScheduler;
-use alice_core::types::Message;
+use alice_core::types::{Message, ToolDef};
 use alice_core::abort_manager::AbortManager;
 use alice_core::world::{HasComponent, World};
 use futures_core::Stream;
@@ -45,7 +45,7 @@ impl HasComponent<ToolsComponent> for TestComponents {
 struct NullProvider;
 
 impl StreamingProvider for NullProvider {
-    fn format_messages(&self, _messages: &[Message]) -> serde_json::Value {
+    fn format_messages(&self, _messages: &[Message], _tools: &[ToolDef]) -> serde_json::Value {
         serde_json::Value::Null
     }
 

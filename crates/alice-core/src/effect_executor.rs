@@ -108,7 +108,8 @@ where
                 }
             }
             Effect::CallLLM { messages } => {
-                let body = self.provider.format_messages(&messages);
+                let tools = self.world.get::<ToolsComponent>().definitions.clone();
+                let body = self.provider.format_messages(&messages, &tools);
                 let mut stream = self.provider.stream_chat(body);
                 let mut assistant_content = String::new();
                 let mut tool_calls = Vec::new();
