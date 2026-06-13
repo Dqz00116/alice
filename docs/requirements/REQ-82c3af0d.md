@@ -1,7 +1,7 @@
 ---
 id: REQ-82c3af0d
 title: Configure Anthropic Model ID via .env
-status: approved
+status: done
 ---
 
 # Configure Anthropic Model ID via .env
