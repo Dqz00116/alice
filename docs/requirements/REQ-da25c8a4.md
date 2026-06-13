@@ -1,7 +1,7 @@
 ---
 id: REQ-da25c8a4
 title: Configurable Anthropic Base URL
-status: approved
+status: done
 ---
 
 # Configurable Anthropic Base URL
