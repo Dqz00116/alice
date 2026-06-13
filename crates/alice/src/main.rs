@@ -49,11 +49,16 @@ async fn main() -> anyhow::Result<()> {
     if api_key.is_none() {
         eprintln!("Warning: ANTHROPIC_API_KEY not set. LLM calls will fail.");
     }
+    let base_url = match std::env::var("ANTHROPIC_BASE_URL") {
+        Ok(url) if !url.is_empty() => url,
+        _ => "https://api.anthropic.com".into(),
+    };
 
     let mut world = World::new(AllComponents {
         messages: MessagesComponent::default(),
         config: ConfigComponent {
             api_key: api_key.clone(),
+            base_url: base_url.clone(),
             ..ConfigComponent::default()
         },
         loop_state: LoopComponent { step: 0, should_continue: true },
@@ -91,6 +96,7 @@ async fn main() -> anyhow::Result<()> {
     let provider = AnthropicProvider::new(
         api_key.unwrap_or_default(),
         world.get::<ConfigComponent>().model.clone(),
+        world.get::<ConfigComponent>().base_url.clone(),
     );
 
     print!("You: ");
