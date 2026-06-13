@@ -10,7 +10,11 @@ async fn test_anthropic_live_stream_chat() {
     let api_key = std::env::var("ANTHROPIC_API_KEY")
         .expect("ANTHROPIC_API_KEY must be set to run this test");
 
-    let provider = AnthropicProvider::new(api_key, "claude-3-5-sonnet-20241022".into());
+    let provider = AnthropicProvider::new(
+        api_key,
+        "claude-3-5-sonnet-20241022".into(),
+        "https://api.anthropic.com".into(),
+    );
 
     let body = provider.format_messages(&[Message::User {
         content: "Say hello in one word.".into(),

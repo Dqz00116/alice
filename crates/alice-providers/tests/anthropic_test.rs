@@ -1,5 +1,5 @@
 use alice_core::event::LLMStreamEvent;
-use alice_providers::anthropic::parse_sse_data;
+use alice_providers::anthropic::{parse_sse_data, AnthropicProvider};
 
 #[test]
 fn test_parse_sse_done() {
@@ -45,4 +45,24 @@ fn test_parse_sse_unknown_type() {
 #[test]
 fn test_parse_sse_invalid_json() {
     assert!(parse_sse_data("not valid json").is_none());
+}
+
+#[test]
+fn test_custom_base_url_is_normalized() {
+    let provider = AnthropicProvider::new(
+        "fake-key".into(),
+        "claude-test".into(),
+        "https://api.example.com/anthropic/".into(),
+    );
+    assert_eq!(provider.base_url(), "https://api.example.com/anthropic/");
+}
+
+#[test]
+fn test_default_base_url() {
+    let provider = AnthropicProvider::new(
+        "fake-key".into(),
+        "claude-test".into(),
+        "https://api.anthropic.com".into(),
+    );
+    assert_eq!(provider.base_url(), "https://api.anthropic.com");
 }

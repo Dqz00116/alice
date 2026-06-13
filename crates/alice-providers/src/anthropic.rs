@@ -7,16 +7,22 @@ use std::pin::Pin;
 pub struct AnthropicProvider {
     api_key: String,
     model: String,
+    base_url: String,
     client: reqwest::Client,
 }
 
 impl AnthropicProvider {
-    pub fn new(api_key: String, model: String) -> Self {
+    pub fn new(api_key: String, model: String, base_url: String) -> Self {
         Self {
             api_key,
             model,
+            base_url,
             client: reqwest::Client::new(),
         }
+    }
+
+    pub fn base_url(&self) -> &str {
+        &self.base_url
     }
 }
 
@@ -93,9 +99,11 @@ impl super::traits::StreamingProvider for AnthropicProvider {
     ) -> Pin<Box<dyn Stream<Item = LLMStreamEvent> + Send + '_>> {
         let client = self.client.clone();
         let api_key = self.api_key.clone();
+        let base_url = self.base_url.trim_end_matches('/').to_string();
         Box::pin(async_stream::stream! {
+            let url = format!("{}/v1/messages", base_url);
             let resp = client
-                .post("https://api.anthropic.com/v1/messages")
+                .post(&url)
                 .header("x-api-key", &api_key)
                 .header("anthropic-version", "2023-06-01")
                 .json(&body)
