@@ -83,15 +83,28 @@ where
                     match r.error {
                         Some(err) => {
                             self.event_sink.emit(Event::Tool(ToolEvent::Error {
-                                tool_call_id: r.tool_call_id,
-                                error: err,
+                                tool_call_id: r.tool_call_id.clone(),
+                                error: err.clone(),
                             }));
+                            self.world.get_mut::<MessagesComponent>().messages.push(
+                                crate::types::Message::Tool {
+                                    content: format!("Error: {err}"),
+                                    tool_call_id: r.tool_call_id,
+                                },
+                            );
                         }
                         None => {
+                            let result = r.result.unwrap_or_default();
                             self.event_sink.emit(Event::Tool(ToolEvent::Result {
-                                tool_call_id: r.tool_call_id,
-                                result: r.result.unwrap_or_default(),
+                                tool_call_id: r.tool_call_id.clone(),
+                                result: result.clone(),
                             }));
+                            self.world.get_mut::<MessagesComponent>().messages.push(
+                                crate::types::Message::Tool {
+                                    content: result,
+                                    tool_call_id: r.tool_call_id,
+                                },
+                            );
                         }
                     }
                 }
@@ -122,6 +135,7 @@ where
                             self.event_sink.emit(Event::System(SystemEvent::HookTrigger {
                                 hook: "afterStep".into(),
                             }));
+                            self.world.get_mut::<LoopComponent>().step += 1;
                         }
                         LLMStreamEvent::StreamError { .. } => {}
                     }
