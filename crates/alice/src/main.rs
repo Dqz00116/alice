@@ -10,7 +10,7 @@ use alice_core::tool_scheduler::ToolScheduler;
 use alice_core::abort_manager::AbortManager;
 use alice_core::world::{HasComponent, World};
 use alice_providers::anthropic::AnthropicProvider;
-use alice_tools::echo;
+use alice_tools::{bash, echo, edit_file, glob, read_file, write_file};
 use std::collections::VecDeque;
 use std::io::{self, Write};
 
@@ -75,6 +75,11 @@ async fn main() -> anyhow::Result<()> {
     let mut queue: VecDeque<Event> = VecDeque::new();
     let mut tool_scheduler = ToolScheduler::new();
     tool_scheduler.register(echo::echo_def(), echo::echo_handler);
+    tool_scheduler.register(bash::bash_def(), bash::bash_handler);
+    tool_scheduler.register(read_file::read_file_def(), read_file::read_file_handler);
+    tool_scheduler.register(write_file::write_file_def(), write_file::write_file_handler);
+    tool_scheduler.register(edit_file::edit_file_def(), edit_file::edit_file_handler);
+    tool_scheduler.register(glob::glob_def(), glob::glob_handler);
     let mut abort_manager = AbortManager::new();
     let pipeline = MiddlewarePipeline::new();
 

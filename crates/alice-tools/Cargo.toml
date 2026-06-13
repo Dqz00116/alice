@@ -6,3 +6,4 @@ edition = "2021"
 [dependencies]
 alice-core = { path = "../alice-core" }
 serde_json = "1"
+glob = "0.3"
