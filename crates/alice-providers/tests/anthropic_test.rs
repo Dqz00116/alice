@@ -66,3 +66,13 @@ fn test_default_base_url() {
     );
     assert_eq!(provider.base_url(), "https://api.anthropic.com");
 }
+
+#[test]
+fn test_custom_model_id() {
+    let provider = AnthropicProvider::new(
+        "fake-key".into(),
+        "claude-test-model".into(),
+        "https://api.anthropic.com".into(),
+    );
+    assert_eq!(provider.model(), "claude-test-model");
+}

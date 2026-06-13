@@ -24,6 +24,10 @@ impl AnthropicProvider {
     pub fn base_url(&self) -> &str {
         &self.base_url
     }
+
+    pub fn model(&self) -> &str {
+        &self.model
+    }
 }
 
 pub fn parse_sse_data(data: &str) -> Option<LLMStreamEvent> {
