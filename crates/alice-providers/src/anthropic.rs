@@ -117,20 +117,36 @@ impl super::traits::StreamingProvider for AnthropicProvider {
                     serde_json::json!({ "role": "user", "content": content })
                 }
                 Message::Assistant { content, tool_calls } => {
-                    let mut obj = serde_json::json!({ "role": "assistant", "content": content });
-                    if !tool_calls.is_empty() {
-                        obj["tool_calls"] = serde_json::to_value(tool_calls).unwrap();
+                    if tool_calls.is_empty() {
+                        serde_json::json!({ "role": "assistant", "content": content })
+                    } else {
+                        let mut content_blocks =
+                            vec![serde_json::json!({ "type": "text", "text": content })];
+                        for tc in tool_calls {
+                            let input: serde_json::Value =
+                                serde_json::from_str(&tc.function.arguments)
+                                    .unwrap_or_else(|_| serde_json::json!({}));
+                            content_blocks.push(serde_json::json!({
+                                "type": "tool_use",
+                                "id": tc.id,
+                                "name": tc.function.name,
+                                "input": input,
+                            }));
+                        }
+                        serde_json::json!({ "role": "assistant", "content": content_blocks })
                     }
-                    obj
                 }
                 Message::Tool {
                     content,
                     tool_call_id,
                 } => {
                     serde_json::json!({
-                        "role": "tool",
-                        "content": content,
-                        "tool_call_id": tool_call_id
+                        "role": "user",
+                        "content": [{
+                            "type": "tool_result",
+                            "tool_use_id": tool_call_id,
+                            "content": content,
+                        }]
                     })
                 }
             })

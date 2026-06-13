@@ -1,6 +1,6 @@
 use alice_core::event::LLMStreamEvent;
 use alice_core::providers::StreamingProvider;
-use alice_core::types::ToolDef;
+use alice_core::types::{FunctionCall, Message, ToolCall, ToolDef};
 use alice_providers::anthropic::{parse_sse_data, parse_sse_value, AnthropicProvider};
 
 #[test]
@@ -164,4 +164,56 @@ fn test_parse_tool_use_with_split_partial_json() {
         }
         _ => panic!("expected ToolCall event"),
     }
+}
+
+#[test]
+fn test_assistant_message_with_tool_use() {
+    let provider = AnthropicProvider::new(
+        "fake-key".into(),
+        "claude-test".into(),
+        "https://api.anthropic.com".into(),
+    );
+    let messages = vec![Message::Assistant {
+        content: "I'll echo that.".into(),
+        tool_calls: vec![ToolCall {
+            id: "tool_1".into(),
+            call_type: "tool_use".into(),
+            function: FunctionCall {
+                name: "echo".into(),
+                arguments: r#"{"message":"hello"}"#.into(),
+            },
+        }],
+    }];
+    let body = provider.format_messages(&messages, &[]);
+    let formatted = body.get("messages").and_then(|v| v.as_array()).unwrap();
+    let msg = formatted[0].as_object().unwrap();
+    assert_eq!(msg["role"], "assistant");
+    let content = msg["content"].as_array().expect("expected content array");
+    assert_eq!(content.len(), 2);
+    assert_eq!(content[0]["type"], "text");
+    assert_eq!(content[1]["type"], "tool_use");
+    assert_eq!(content[1]["name"], "echo");
+    assert_eq!(content[1]["input"]["message"], "hello");
+}
+
+#[test]
+fn test_tool_result_message() {
+    let provider = AnthropicProvider::new(
+        "fake-key".into(),
+        "claude-test".into(),
+        "https://api.anthropic.com".into(),
+    );
+    let messages = vec![Message::Tool {
+        content: "hello".into(),
+        tool_call_id: "tool_1".into(),
+    }];
+    let body = provider.format_messages(&messages, &[]);
+    let formatted = body.get("messages").and_then(|v| v.as_array()).unwrap();
+    let msg = &formatted[0];
+    assert_eq!(msg["role"], "user");
+    let content = msg["content"].as_array().expect("expected content array");
+    assert_eq!(content.len(), 1);
+    assert_eq!(content[0]["type"], "tool_result");
+    assert_eq!(content[0]["tool_use_id"], "tool_1");
+    assert_eq!(content[0]["content"], "hello");
 }
