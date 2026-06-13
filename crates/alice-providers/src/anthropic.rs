@@ -1,5 +1,5 @@
 use alice_core::event::LLMStreamEvent;
-use alice_core::types::{Message, ToolDef};
+use alice_core::types::{FunctionCall, Message, ToolCall, ToolDef};
 use futures_core::Stream;
 use futures_util::StreamExt;
 use std::pin::Pin;
@@ -30,15 +30,10 @@ impl AnthropicProvider {
     }
 }
 
-pub fn parse_sse_data(data: &str) -> Option<LLMStreamEvent> {
-    if data == "[DONE]" {
-        return Some(LLMStreamEvent::StreamEnd {
-            stop_reason: "end_turn".into(),
-        });
-    }
-
-    let value: serde_json::Value = serde_json::from_str(data).ok()?;
-
+pub fn parse_sse_value(
+    value: &serde_json::Value,
+    current_tool: &mut Option<(String, String, String)>,
+) -> Option<LLMStreamEvent> {
     match value.get("type").and_then(|v| v.as_str()) {
         Some("content_block_delta") => {
             let delta = value.get("delta")?;
@@ -52,6 +47,46 @@ pub fn parse_sse_data(data: &str) -> Option<LLMStreamEvent> {
                     delta: thinking.to_string(),
                 });
             }
+            if let Some(partial) = delta.get("partial_json").and_then(|v| v.as_str()) {
+                if let Some((_, _, ref mut acc)) = current_tool {
+                    acc.push_str(partial);
+                }
+            }
+            None
+        }
+        Some("content_block_start") => {
+            if let Some(block) = value.get("content_block") {
+                if block.get("type").and_then(|v| v.as_str()) == Some("tool_use") {
+                    let id = block
+                        .get("id")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("")
+                        .to_string();
+                    let name = block
+                        .get("name")
+                        .and_then(|v| v.as_str())
+                        .unwrap_or("")
+                        .to_string();
+                    *current_tool = Some((id, name, String::new()));
+                }
+            }
+            None
+        }
+        Some("content_block_stop") => {
+            if let Some((id, name, partial)) = current_tool.take() {
+                let input: serde_json::Value =
+                    serde_json::from_str(&partial).unwrap_or_else(|_| serde_json::json!({}));
+                return Some(LLMStreamEvent::ToolCall {
+                    tool_call: ToolCall {
+                        id,
+                        call_type: "tool_use".into(),
+                        function: FunctionCall {
+                            name,
+                            arguments: input.to_string(),
+                        },
+                    },
+                });
+            }
             None
         }
         Some("message_stop") => Some(LLMStreamEvent::StreamEnd {
@@ -59,6 +94,18 @@ pub fn parse_sse_data(data: &str) -> Option<LLMStreamEvent> {
         }),
         _ => None,
     }
+}
+
+pub fn parse_sse_data(data: &str) -> Option<LLMStreamEvent> {
+    if data == "[DONE]" {
+        return Some(LLMStreamEvent::StreamEnd {
+            stop_reason: "end_turn".into(),
+        });
+    }
+
+    let value: serde_json::Value = serde_json::from_str(data).ok()?;
+    let mut current_tool = None;
+    parse_sse_value(&value, &mut current_tool)
 }
 
 impl super::traits::StreamingProvider for AnthropicProvider {
@@ -147,6 +194,7 @@ impl super::traits::StreamingProvider for AnthropicProvider {
 
             let mut stream = response.bytes_stream();
             let mut buffer = String::new();
+            let mut current_tool: Option<(String, String, String)> = None;
 
             while let Some(chunk) = stream.next().await {
                 let chunk = match chunk {
@@ -167,7 +215,22 @@ impl super::traits::StreamingProvider for AnthropicProvider {
                     }
 
                     if let Some(data) = line.strip_prefix("data: ") {
-                        match parse_sse_data(data) {
+                        if data == "[DONE]" {
+                            yield LLMStreamEvent::StreamEnd { stop_reason: "end_turn".into() };
+                            return;
+                        }
+
+                        let value: serde_json::Value = match serde_json::from_str(data) {
+                            Ok(v) => v,
+                            Err(e) => {
+                                yield LLMStreamEvent::StreamError {
+                                    error: format!("invalid JSON in SSE data: {e}"),
+                                };
+                                return;
+                            }
+                        };
+
+                        match parse_sse_value(&value, &mut current_tool) {
                             Some(LLMStreamEvent::StreamEnd { .. }) => {
                                 yield LLMStreamEvent::StreamEnd { stop_reason: "end_turn".into() };
                                 return;

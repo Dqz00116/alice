@@ -1,7 +1,7 @@
 use alice_core::event::LLMStreamEvent;
 use alice_core::providers::StreamingProvider;
 use alice_core::types::ToolDef;
-use alice_providers::anthropic::{parse_sse_data, AnthropicProvider};
+use alice_providers::anthropic::{parse_sse_data, parse_sse_value, AnthropicProvider};
 
 #[test]
 fn test_parse_sse_done() {
@@ -101,4 +101,67 @@ fn test_format_messages_includes_tools() {
     let tools_array = body.get("tools").and_then(|v| v.as_array()).expect("expected tools array");
     assert_eq!(tools_array.len(), 1);
     assert_eq!(tools_array[0].get("name").and_then(|v| v.as_str()), Some("echo"));
+}
+
+#[test]
+fn test_parse_tool_use_sse_events() {
+    let mut tool: Option<(String, String, String)> = None;
+
+    let start = serde_json::json!({
+        "type": "content_block_start",
+        "content_block": { "type": "tool_use", "id": "tool_1", "name": "echo" }
+    });
+    assert!(parse_sse_value(&start, &mut tool).is_none());
+
+    let delta = serde_json::json!({
+        "type": "content_block_delta",
+        "delta": { "partial_json": r#"{"message":"hi"}"# }
+    });
+    assert!(parse_sse_value(&delta, &mut tool).is_none());
+
+    let stop = serde_json::json!({ "type": "content_block_stop" });
+    let event = parse_sse_value(&stop, &mut tool);
+    match event {
+        Some(LLMStreamEvent::ToolCall { tool_call }) => {
+            assert_eq!(tool_call.id, "tool_1");
+            assert_eq!(tool_call.function.name, "echo");
+            let input: serde_json::Value = serde_json::from_str(&tool_call.function.arguments).unwrap();
+            assert_eq!(input["message"], "hi");
+        }
+        _ => panic!("expected ToolCall event, got {:?}", event),
+    }
+}
+
+#[test]
+fn test_parse_tool_use_with_split_partial_json() {
+    let mut tool: Option<(String, String, String)> = None;
+
+    let start = serde_json::json!({
+        "type": "content_block_start",
+        "content_block": { "type": "tool_use", "id": "tool_2", "name": "echo" }
+    });
+    parse_sse_value(&start, &mut tool);
+
+    parse_sse_value(
+        &serde_json::json!({"type":"content_block_delta","delta":{"partial_json":"{\"mes"}}),
+        &mut tool,
+    );
+    parse_sse_value(
+        &serde_json::json!({"type":"content_block_delta","delta":{"partial_json":"sage\":\"hi"}}),
+        &mut tool,
+    );
+    parse_sse_value(
+        &serde_json::json!({"type":"content_block_delta","delta":{"partial_json":"\"}"}}),
+        &mut tool,
+    );
+
+    let event = parse_sse_value(&serde_json::json!({"type":"content_block_stop"}), &mut tool);
+    match event {
+        Some(LLMStreamEvent::ToolCall { tool_call }) => {
+            assert_eq!(tool_call.id, "tool_2");
+            let input: serde_json::Value = serde_json::from_str(&tool_call.function.arguments).unwrap();
+            assert_eq!(input["message"], "hi");
+        }
+        _ => panic!("expected ToolCall event"),
+    }
 }
