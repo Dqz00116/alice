@@ -104,6 +104,42 @@ fn test_format_messages_includes_tools() {
 }
 
 #[test]
+fn test_format_messages_includes_multiple_tools() {
+    let provider = AnthropicProvider::new(
+        "fake-key".into(),
+        "claude-test".into(),
+        "https://api.anthropic.com".into(),
+    );
+    let tools = vec![
+        ToolDef {
+            name: "echo".into(),
+            description: "Echoes input".into(),
+            input_schema: serde_json::json!({"type": "object"}),
+        },
+        ToolDef {
+            name: "Bash".into(),
+            description: "Runs shell commands".into(),
+            input_schema: serde_json::json!({"type": "object"}),
+        },
+        ToolDef {
+            name: "FileRead".into(),
+            description: "Reads files".into(),
+            input_schema: serde_json::json!({"type": "object"}),
+        },
+    ];
+    let body = provider.format_messages(&[], &tools);
+    let tools_array = body.get("tools").and_then(|v| v.as_array()).expect("expected tools array");
+    assert_eq!(tools_array.len(), 3);
+    let names: Vec<&str> = tools_array
+        .iter()
+        .filter_map(|t| t.get("name").and_then(|v| v.as_str()))
+        .collect();
+    assert!(names.contains(&"echo"));
+    assert!(names.contains(&"Bash"));
+    assert!(names.contains(&"FileRead"));
+}
+
+#[test]
 fn test_parse_tool_use_sse_events() {
     let mut tool: Option<(String, String, String)> = None;
 
