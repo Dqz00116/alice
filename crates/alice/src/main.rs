@@ -104,50 +104,65 @@ async fn main() -> anyhow::Result<()> {
         world.get::<ConfigComponent>().base_url.clone(),
     );
 
-    print!("You: ");
-    io::stdout().flush()?;
-    let mut input = String::new();
-    io::stdin().read_line(&mut input)?;
-    let input = input.trim().to_string();
-    if input.is_empty() {
-        return Ok(());
-    }
+    loop {
+        print!("You: ");
+        io::stdout().flush()?;
+        let mut input = String::new();
+        io::stdin().read_line(&mut input)?;
+        let input = input.trim();
 
-    queue.push_back(Event::Input(InputEvent {
-        source: "cli".into(),
-        content: input,
-    }));
-
-    while let Some(raw_event) = queue.pop_front() {
-        if abort_manager.is_aborted() {
+        if input.eq_ignore_ascii_case("/exit") || input.eq_ignore_ascii_case("/quit") {
             break;
         }
+        if input.is_empty() {
+            continue;
+        }
 
-        let event = pipeline.run(raw_event);
-        let systems = registry.get_systems_for_event(&event);
-        let effects = {
-            let snapshot = world.snapshot();
-            let mut effects = Vec::new();
-            for system in systems {
-                effects.extend(system.process(&snapshot, &event));
+        queue.push_back(Event::Input(InputEvent {
+            source: "cli".into(),
+            content: input.to_string(),
+        }));
+
+        print!("Alice: ");
+        io::stdout().flush()?;
+
+        while let Some(raw_event) = queue.pop_front() {
+            if abort_manager.is_aborted() {
+                break;
             }
-            effects
-        };
 
-        let mut executor = EffectExecutor::new(
-            &mut world,
-            &mut queue,
-            &tool_scheduler,
-            &mut abort_manager,
-            &provider,
-        );
-        executor.execute(effects).await;
+            let event = pipeline.run(raw_event);
+            let systems = registry.get_systems_for_event(&event);
+            let effects = {
+                let snapshot = world.snapshot();
+                let mut effects = Vec::new();
+                for system in systems {
+                    effects.extend(system.process(&snapshot, &event));
+                }
+                effects
+            };
 
-        if !world.get::<LoopComponent>().should_continue {
+            let mut executor = EffectExecutor::new(
+                &mut world,
+                &mut queue,
+                &tool_scheduler,
+                &mut abort_manager,
+                &provider,
+            );
+            executor.execute(effects).await;
+
+            if !world.get::<LoopComponent>().should_continue {
+                break;
+            }
+        }
+
+        println!();
+
+        if !world.get::<LoopComponent>().should_continue || abort_manager.is_aborted() {
             break;
         }
     }
 
-    println!("\n[Alice session ended]");
+    println!("[Alice session ended]");
     Ok(())
 }
