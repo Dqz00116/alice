@@ -217,3 +217,77 @@ async fn test_middleware_transforms_step_start() {
     let messages = &world.get::<MessagesComponent>().messages;
     assert_eq!(messages.len(), 2, "loop should still complete after transformation");
 }
+
+#[tokio::test]
+async fn test_multi_turn_produces_two_replies() {
+    let mut world = World::new(TestComponents {
+        loop_state: LoopComponent { step: 0, should_continue: true },
+        ..TestComponents::default()
+    });
+
+    let mut queue: VecDeque<Event> = VecDeque::new();
+    let tool_scheduler = ToolScheduler::new();
+    let mut abort_manager = AbortManager::new();
+
+    let mut registry = SystemRegistry::<TestComponents>::new();
+    registry.register(input::input_system::<TestComponents>, &["input.user"]);
+    registry.register(provider::provider_system::<TestComponents>, &[
+        "system.step_start",
+        "tool.result",
+        "tool.error",
+    ]);
+    registry.register(tool::tool_system::<TestComponents>, &["llm.tool_call"]);
+    registry.register(
+        output::output_system::<TestComponents>,
+        &[
+            "llm.thinking_delta",
+            "llm.text_delta",
+            "llm.tool_call",
+            "llm.stream_end",
+            "llm.stream_error",
+        ],
+    );
+    registry.register(hook::hook_system::<TestComponents>, &["system.hook_trigger"]);
+
+    let provider = EchoProvider;
+
+    queue.push_back(Event::Input(InputEvent {
+        source: "test".into(),
+        content: "Hi".into(),
+    }));
+    queue.push_back(Event::Input(InputEvent {
+        source: "test".into(),
+        content: "Again".into(),
+    }));
+
+    while let Some(raw_event) = queue.pop_front() {
+        let event = raw_event;
+        let systems = registry.get_systems_for_event(&event);
+        let effects = {
+            let snapshot = world.snapshot();
+            let mut effects = Vec::new();
+            for system in systems {
+                effects.extend(system.process(&snapshot, &event));
+            }
+            effects
+        };
+
+        let mut executor = EffectExecutor::new(
+            &mut world,
+            &mut queue,
+            &tool_scheduler,
+            &mut abort_manager,
+            &provider,
+        );
+        executor.execute(effects).await;
+
+        if !world.get::<LoopComponent>().should_continue {
+            break;
+        }
+    }
+
+    let messages = &world.get::<MessagesComponent>().messages;
+    let assistant_count = messages.iter().filter(|m| matches!(m, Message::Assistant { .. })).count();
+    assert_eq!(assistant_count, 2, "expected two assistant replies for two user inputs");
+    assert_eq!(world.get::<LoopComponent>().step, 2);
+}
