@@ -1,7 +1,7 @@
 ---
 id: REQ-3bc87e1a
 title: Fix Loop Step Tracking and Tool Result Message Write-Back
-status: approved
+status: done
 priority: high
 ---
 
