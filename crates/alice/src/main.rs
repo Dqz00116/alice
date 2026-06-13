@@ -44,6 +44,7 @@ impl HasComponent<ToolsComponent> for AllComponents {
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+    dotenvy::dotenv().ok();
     let api_key = std::env::var("ANTHROPIC_API_KEY").ok();
     if api_key.is_none() {
         eprintln!("Warning: ANTHROPIC_API_KEY not set. LLM calls will fail.");
