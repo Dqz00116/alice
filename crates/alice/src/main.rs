@@ -4,6 +4,7 @@ use alice_core::components::{
 use alice_core::effect_executor::EffectExecutor;
 use alice_core::event::{Event, InputEvent};
 use alice_core::system_registry::SystemRegistry;
+use alice_core::middleware::MiddlewarePipeline;
 use alice_core::systems::{hook, input, output, provider, tool};
 use alice_core::tool_scheduler::ToolScheduler;
 use alice_core::abort_manager::AbortManager;
@@ -64,6 +65,7 @@ async fn main() -> anyhow::Result<()> {
     let mut tool_scheduler = ToolScheduler::new();
     tool_scheduler.register(echo::echo_def(), echo::echo_handler);
     let mut abort_manager = AbortManager::new();
+    let pipeline = MiddlewarePipeline::new();
 
     let mut registry = SystemRegistry::<AllComponents>::new();
     registry.register(input::input_system::<AllComponents>, &["input.user"]);
@@ -104,11 +106,12 @@ async fn main() -> anyhow::Result<()> {
         content: input,
     }));
 
-    while let Some(event) = queue.pop_front() {
+    while let Some(raw_event) = queue.pop_front() {
         if abort_manager.is_aborted() {
             break;
         }
 
+        let event = pipeline.run(raw_event);
         let systems = registry.get_systems_for_event(&event);
         let effects = {
             let snapshot = world.snapshot();
