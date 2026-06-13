@@ -68,7 +68,14 @@ async fn main() -> anyhow::Result<()> {
         },
         loop_state: LoopComponent { step: 0, should_continue: true },
         tools: ToolsComponent {
-            definitions: vec![echo::echo_def()],
+            definitions: vec![
+                echo::echo_def(),
+                bash::bash_def(),
+                read_file::read_file_def(),
+                write_file::write_file_def(),
+                edit_file::edit_file_def(),
+                glob::glob_def(),
+            ],
         },
     });
 
