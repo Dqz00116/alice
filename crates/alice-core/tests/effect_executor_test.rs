@@ -3,12 +3,13 @@ use alice_core::components::{
 };
 use alice_core::effect::Effect;
 use alice_core::effect_executor::EffectExecutor;
-use alice_core::event::LLMStreamEvent;
+use alice_core::event::{Event, LLMStreamEvent};
 use alice_core::event_bus::EventBus;
 use alice_core::providers::StreamingProvider;
+use alice_core::systems::tool::tool_system;
 use alice_core::tool_scheduler::ToolScheduler;
 use alice_core::abort_manager::AbortManager;
-use alice_core::types::{Message, ToolDef};
+use alice_core::types::{FunctionCall, Message, ToolCall, ToolDef};
 use alice_core::world::{HasComponent, World};
 use futures_core::Stream;
 use std::pin::Pin;
@@ -92,6 +93,7 @@ async fn test_execute_tool_appends_tool_message() {
     );
     executor
         .execute(vec![Effect::ExecuteTool {
+            tool_call_id: "toolu_original_id".into(),
             tool_name: "echo".into(),
             args: serde_json::json!({ "message": "hello" }),
         }])
@@ -105,7 +107,7 @@ async fn test_execute_tool_appends_tool_message() {
             tool_call_id,
         } => {
             assert_eq!(content, "hello");
-            assert!(!tool_call_id.is_empty());
+            assert_eq!(tool_call_id, "toolu_original_id");
         }
         _ => panic!("expected Message::Tool, got {:?}", msgs[0]),
     }
@@ -150,4 +152,70 @@ async fn test_call_llm_increments_loop_step() {
         .await;
 
     assert_eq!(world.get::<LoopComponent>().step, 1);
+}
+
+#[tokio::test]
+async fn test_execute_tool_unknown_tool_preserves_id() {
+    let mut world = World::new(TestComponents::default());
+    let mut event_bus = EventBus::new();
+    let tool_scheduler = ToolScheduler::new();
+    let mut abort_manager = AbortManager::new();
+
+    let provider = NullProvider;
+    let mut executor = EffectExecutor::new(
+        &mut world,
+        &mut event_bus,
+        &tool_scheduler,
+        &mut abort_manager,
+        &provider,
+    );
+    executor
+        .execute(vec![Effect::ExecuteTool {
+            tool_call_id: "toolu_missing".into(),
+            tool_name: "nonexistent".into(),
+            args: serde_json::json!({}),
+        }])
+        .await;
+
+    let msgs = &world.get::<MessagesComponent>().messages;
+    assert_eq!(msgs.len(), 1);
+    match &msgs[0] {
+        Message::Tool {
+            content,
+            tool_call_id,
+        } => {
+            assert!(content.contains("unknown tool"));
+            assert_eq!(tool_call_id, "toolu_missing");
+        }
+        _ => panic!("expected Message::Tool, got {:?}", msgs[0]),
+    }
+}
+
+#[test]
+fn test_tool_system_preserves_tool_call_id() {
+    let world = World::new(TestComponents::default());
+    let snapshot = world.snapshot();
+    let tool_call = ToolCall {
+        id: "toolu_abc123".into(),
+        call_type: "tool_use".into(),
+        function: FunctionCall {
+            name: "bash".into(),
+            arguments: r#"{"command":"ls"}"#.into(),
+        },
+    };
+    let event = Event::LLMStream(LLMStreamEvent::ToolCall { tool_call });
+    let effects = tool_system(&snapshot, &event);
+
+    assert_eq!(effects.len(), 1);
+    match &effects[0] {
+        Effect::ExecuteTool {
+            tool_call_id,
+            tool_name,
+            ..
+        } => {
+            assert_eq!(tool_call_id, "toolu_abc123");
+            assert_eq!(tool_name, "bash");
+        }
+        _ => panic!("expected Effect::ExecuteTool, got {:?}", effects[0]),
+    }
 }
