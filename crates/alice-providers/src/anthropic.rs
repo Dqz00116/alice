@@ -20,6 +20,37 @@ impl AnthropicProvider {
     }
 }
 
+pub fn parse_sse_data(data: &str) -> Option<LLMStreamEvent> {
+    if data == "[DONE]" {
+        return Some(LLMStreamEvent::StreamEnd {
+            stop_reason: "end_turn".into(),
+        });
+    }
+
+    let value: serde_json::Value = serde_json::from_str(data).ok()?;
+
+    match value.get("type").and_then(|v| v.as_str()) {
+        Some("content_block_delta") => {
+            let delta = value.get("delta")?;
+            if let Some(text) = delta.get("text").and_then(|v| v.as_str()) {
+                return Some(LLMStreamEvent::TextDelta {
+                    delta: text.to_string(),
+                });
+            }
+            if let Some(thinking) = delta.get("thinking").and_then(|v| v.as_str()) {
+                return Some(LLMStreamEvent::ThinkingDelta {
+                    delta: thinking.to_string(),
+                });
+            }
+            None
+        }
+        Some("message_stop") => Some(LLMStreamEvent::StreamEnd {
+            stop_reason: "end_turn".into(),
+        }),
+        _ => None,
+    }
+}
+
 impl super::traits::StreamingProvider for AnthropicProvider {
     fn format_messages(&self, messages: &[Message]) -> serde_json::Value {
         let formatted: Vec<serde_json::Value> = messages
@@ -109,37 +140,13 @@ impl super::traits::StreamingProvider for AnthropicProvider {
                     }
 
                     if let Some(data) = line.strip_prefix("data: ") {
-                        if data == "[DONE]" {
-                            yield LLMStreamEvent::StreamEnd { stop_reason: "end_turn".into() };
-                            return;
-                        }
-
-                        let value: serde_json::Value = match serde_json::from_str(data) {
-                            Ok(v) => v,
-                            Err(e) => {
-                                yield LLMStreamEvent::StreamError {
-                                    error: format!("invalid JSON in SSE data: {e}"),
-                                };
-                                return;
-                            }
-                        };
-
-                        match value.get("type").and_then(|v| v.as_str()) {
-                            Some("content_block_delta") => {
-                                if let Some(delta) = value.get("delta") {
-                                    if let Some(text) = delta.get("text").and_then(|v| v.as_str()) {
-                                        yield LLMStreamEvent::TextDelta { delta: text.to_string() };
-                                    }
-                                    if let Some(thinking) = delta.get("thinking").and_then(|v| v.as_str()) {
-                                        yield LLMStreamEvent::ThinkingDelta { delta: thinking.to_string() };
-                                    }
-                                }
-                            }
-                            Some("message_stop") => {
+                        match parse_sse_data(data) {
+                            Some(LLMStreamEvent::StreamEnd { .. }) => {
                                 yield LLMStreamEvent::StreamEnd { stop_reason: "end_turn".into() };
                                 return;
                             }
-                            _ => {}
+                            Some(event) => yield event,
+                            None => {}
                         }
                     }
                 }
