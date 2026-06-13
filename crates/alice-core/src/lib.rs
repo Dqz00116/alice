@@ -2,6 +2,7 @@ pub mod types;
 pub mod event;
 pub mod effect;
 pub mod world;
+pub mod components;
 pub mod event_bus;
 pub mod system;
 pub mod system_registry;
@@ -9,3 +10,5 @@ pub mod effect_executor;
 pub mod tool_scheduler;
 pub mod abort_manager;
 pub mod systems;
+
+pub use components::*;

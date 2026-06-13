@@ -1,19 +1,43 @@
-use alice_core::event_bus::EventBus;
-use alice_core::effect_executor::MessagesComponent;
-use alice_core::tool_scheduler::ToolScheduler;
-use alice_core::abort_manager::AbortManager;
-use alice_core::world::World;
+use alice_core::components::{
+    ConfigComponent, LoopComponent, MessagesComponent, ProviderComponent, ToolsComponent,
+};
+use alice_core::world::{HasComponent, World};
+
+#[derive(Default)]
+struct MainComponents {
+    messages: MessagesComponent,
+    config: ConfigComponent,
+    loop_state: LoopComponent,
+    tools: ToolsComponent,
+    provider: ProviderComponent,
+}
+
+impl HasComponent<MessagesComponent> for MainComponents {
+    fn get(&self) -> &MessagesComponent { &self.messages }
+    fn get_mut(&mut self) -> &mut MessagesComponent { &mut self.messages }
+}
+
+impl HasComponent<ConfigComponent> for MainComponents {
+    fn get(&self) -> &ConfigComponent { &self.config }
+    fn get_mut(&mut self) -> &mut ConfigComponent { &mut self.config }
+}
+
+impl HasComponent<LoopComponent> for MainComponents {
+    fn get(&self) -> &LoopComponent { &self.loop_state }
+    fn get_mut(&mut self) -> &mut LoopComponent { &mut self.loop_state }
+}
+
+impl HasComponent<ToolsComponent> for MainComponents {
+    fn get(&self) -> &ToolsComponent { &self.tools }
+    fn get_mut(&mut self) -> &mut ToolsComponent { &mut self.tools }
+}
+
+impl HasComponent<ProviderComponent> for MainComponents {
+    fn get(&self) -> &ProviderComponent { &self.provider }
+    fn get_mut(&mut self) -> &mut ProviderComponent { &mut self.provider }
+}
 
 fn main() {
-    // World with MessagesComponent for conversation history
-    let components = MessagesComponent { messages: Vec::new() };
-    let _world = World::new(components);
-
-    let _event_bus = EventBus::new();
-    let _tool_scheduler = ToolScheduler::new();
-    let _abort_manager = AbortManager::new();
-
+    let _world = World::new(MainComponents::default());
     println!("Alice Agent ready.");
-    println!("All infrastructure created: World, EventBus, ToolScheduler, AbortManager.");
-    println!("Dynamic dispatch loop will be added in a future batch.");
 }

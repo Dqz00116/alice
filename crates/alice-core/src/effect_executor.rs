@@ -1,21 +1,14 @@
+use crate::components::{
+    ComponentAccessor, ConfigComponent, LoopComponent, MessagesComponent, ProviderComponent,
+    ToolsComponent,
+};
 use crate::effect::Effect;
-use crate::event::Event;
-use crate::event::ToolEvent;
+use crate::event::{Event, ToolEvent};
 use crate::event_bus::EventBus;
 use crate::tool_scheduler::ToolScheduler;
 use crate::abort_manager::AbortManager;
-use crate::types::{Message, ToolCall, FunctionCall};
+use crate::types::{FunctionCall, ToolCall};
 use crate::world::{HasComponent, World};
-
-// Component for storing messages in World
-pub struct MessagesComponent {
-    pub messages: Vec<Message>,
-}
-
-impl HasComponent<MessagesComponent> for MessagesComponent {
-    fn get(&self) -> &MessagesComponent { self }
-    fn get_mut(&mut self) -> &mut MessagesComponent { self }
-}
 
 pub struct EffectExecutor<'a, Components> {
     world: &'a mut World<Components>,
@@ -26,7 +19,12 @@ pub struct EffectExecutor<'a, Components> {
 
 impl<'a, Components> EffectExecutor<'a, Components>
 where
-    Components: HasComponent<MessagesComponent>,
+    Components: HasComponent<MessagesComponent>
+        + HasComponent<LoopComponent>
+        + HasComponent<ConfigComponent>
+        + HasComponent<ToolsComponent>
+        + HasComponent<ProviderComponent>,
+    World<Components>: ComponentAccessor,
 {
     pub fn new(
         world: &'a mut World<Components>,
@@ -52,6 +50,9 @@ where
         match effect {
             Effect::AppendMessage { entity: _, message } => {
                 self.world.get_mut::<MessagesComponent>().messages.push(message);
+            }
+            Effect::UpdateComponent { entity: _, update } => {
+                update.apply(self.world);
             }
             Effect::Emit { event } => {
                 self.event_bus.emit(&event);
@@ -90,7 +91,7 @@ where
                 }
             }
             Effect::CallLLM { messages: _ } => {
-                // Placeholder: wired when ProviderComponent is connected in later batch
+                // Placeholder: wired when StreamingProvider is connected in later batch.
             }
         }
     }
@@ -103,4 +104,33 @@ fn uuid_simple() -> String {
         .unwrap()
         .as_nanos();
     format!("{:x}", ts)
+}
+
+impl<T> ComponentAccessor for World<T>
+where
+    T: HasComponent<MessagesComponent>
+        + HasComponent<LoopComponent>
+        + HasComponent<ConfigComponent>
+        + HasComponent<ToolsComponent>
+        + HasComponent<ProviderComponent>,
+{
+    fn messages_mut(&mut self) -> &mut MessagesComponent {
+        self.get_mut::<MessagesComponent>()
+    }
+
+    fn config_mut(&mut self) -> &mut ConfigComponent {
+        self.get_mut::<ConfigComponent>()
+    }
+
+    fn loop_mut(&mut self) -> &mut LoopComponent {
+        self.get_mut::<LoopComponent>()
+    }
+
+    fn tools_mut(&mut self) -> &mut ToolsComponent {
+        self.get_mut::<ToolsComponent>()
+    }
+
+    fn provider_mut(&mut self) -> &mut ProviderComponent {
+        self.get_mut::<ProviderComponent>()
+    }
 }

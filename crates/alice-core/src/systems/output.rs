@@ -1,8 +1,12 @@
+use crate::components::LoopComponent;
 use crate::effect::{Effect, StreamType};
 use crate::event::{Event, LLMStreamEvent, SystemEvent};
 use crate::world::Snapshot;
 
-pub fn output_system<C>(_snapshot: &Snapshot<&C>, event: &Event) -> Vec<Effect> {
+pub fn output_system<C>(snapshot: &Snapshot<&C>, event: &Event) -> Vec<Effect>
+where
+    C: crate::world::HasComponent<LoopComponent>,
+{
     match event {
         Event::LLMStream(LLMStreamEvent::ThinkingDelta { delta }) => {
             vec![Effect::Render {
@@ -23,9 +27,16 @@ pub fn output_system<C>(_snapshot: &Snapshot<&C>, event: &Event) -> Vec<Effect> 
             }]
         }
         Event::LLMStream(LLMStreamEvent::StreamEnd { .. }) => {
-            vec![Effect::Emit {
-                event: Event::System(SystemEvent::StepEnd { step: 0 }),
-            }]
+            let step = snapshot.get::<LoopComponent>().step;
+            vec![
+                Effect::Render {
+                    content: "\n".into(),
+                    stream: StreamType::Text,
+                },
+                Effect::Emit {
+                    event: Event::System(SystemEvent::StepEnd { step }),
+                },
+            ]
         }
         Event::LLMStream(LLMStreamEvent::StreamError { error }) => {
             vec![Effect::Render {

@@ -1,24 +1,60 @@
+use alice_core::components::{
+    ConfigComponent, LoopComponent, MessagesComponent, ProviderComponent, ToolsComponent,
+};
+use alice_core::effect_executor::EffectExecutor;
 use alice_core::event::{Event, InputEvent};
 use alice_core::event_bus::EventBus;
 use alice_core::system_registry::SystemRegistry;
 use alice_core::systems::input::input_system;
-use alice_core::effect_executor::{EffectExecutor, MessagesComponent};
 use alice_core::tool_scheduler::ToolScheduler;
 use alice_core::abort_manager::AbortManager;
-use alice_core::world::World;
+use alice_core::world::{HasComponent, World};
+
+#[derive(Default)]
+struct TestComponents {
+    messages: MessagesComponent,
+    config: ConfigComponent,
+    loop_state: LoopComponent,
+    tools: ToolsComponent,
+    provider: ProviderComponent,
+}
+
+impl HasComponent<MessagesComponent> for TestComponents {
+    fn get(&self) -> &MessagesComponent { &self.messages }
+    fn get_mut(&mut self) -> &mut MessagesComponent { &mut self.messages }
+}
+
+impl HasComponent<ConfigComponent> for TestComponents {
+    fn get(&self) -> &ConfigComponent { &self.config }
+    fn get_mut(&mut self) -> &mut ConfigComponent { &mut self.config }
+}
+
+impl HasComponent<LoopComponent> for TestComponents {
+    fn get(&self) -> &LoopComponent { &self.loop_state }
+    fn get_mut(&mut self) -> &mut LoopComponent { &mut self.loop_state }
+}
+
+impl HasComponent<ToolsComponent> for TestComponents {
+    fn get(&self) -> &ToolsComponent { &self.tools }
+    fn get_mut(&mut self) -> &mut ToolsComponent { &mut self.tools }
+}
+
+impl HasComponent<ProviderComponent> for TestComponents {
+    fn get(&self) -> &ProviderComponent { &self.provider }
+    fn get_mut(&mut self) -> &mut ProviderComponent { &mut self.provider }
+}
 
 #[test]
 fn test_input_to_append_message_flow() {
-    let components = MessagesComponent { messages: Vec::new() };
+    let components = TestComponents::default();
     let mut world = World::new(components);
     let event_bus = EventBus::new();
     let tool_scheduler = ToolScheduler::new();
     let mut abort_manager = AbortManager::new();
 
-    let mut system_registry: SystemRegistry<MessagesComponent> = SystemRegistry::new();
-    system_registry.register(input_system::<MessagesComponent>, &["input.user"]);
+    let mut system_registry: SystemRegistry<TestComponents> = SystemRegistry::new();
+    system_registry.register(input_system::<TestComponents>, &["input.user"]);
 
-    // Create snapshot and process effects before executor borrows world mutably
     let event = Event::Input(InputEvent {
         source: "cli".into(),
         content: "Hello Alice".into(),
@@ -29,10 +65,7 @@ fn test_input_to_append_message_flow() {
     for sys in systems {
         effects.extend(sys.process(&snapshot, &event));
     }
-    // snapshot dropped here, releasing the immutable borrow on world.
-    // No need to drop system_registry — it doesn't borrow world anymore.
 
-    // Now create executor with mutable access to world
     let mut executor = EffectExecutor::new(
         &mut world,
         &event_bus,
@@ -41,7 +74,6 @@ fn test_input_to_append_message_flow() {
     );
     executor.execute(effects);
 
-    // Verify message was appended
     let msgs = &world.get::<MessagesComponent>().messages;
     assert_eq!(msgs.len(), 1);
     assert!(matches!(msgs[0], alice_core::types::Message::User { .. }));
